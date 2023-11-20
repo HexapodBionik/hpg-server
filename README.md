@@ -1,6 +1,6 @@
 # Hexapod PWM Gadget USB Server
 
-Part of irmware for `Hexapod PWM Gadget` device.
+Part of firmware for `Hexapod PWM Gadget` device.
 
 # Building
 
