@@ -5,6 +5,8 @@ edition = "2021"
 authors = ["Antoni Przybylik <antoni.przybylik@wp.pl>"]
 license = "GPL-2.0"
 readme = "README.md"
+repository = "https://github.com/HexapodBionik/hpg-server"
+description = "Part of firmware for Hexapod PWM Gadget"
 
 [dependencies]
 nix = { version = "0.27", features = ["fs", "poll"] }
