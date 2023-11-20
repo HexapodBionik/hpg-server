@@ -12,7 +12,7 @@ cargo build --release
 Resulting executable file will be in
 `target/release/` directory. You can
 run it directly or through `cargo`
-package manager issuing the command:
+package manager by issuing the command:
 ```
 cargo run --release -- -e <number of endpoints>
 ```
