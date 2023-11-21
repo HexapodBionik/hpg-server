@@ -2,7 +2,8 @@ use libc::{self, c_void};
 use nix::fcntl::{self, OFlag};
 use nix::poll::{self, PollFd, PollFlags};
 use nix::sys::stat::{self, Mode};
-use std::fs::File;
+use std::fs::{OpenOptions, File};
+use std::io::Write;
 use std::mem;
 use std::os::fd::{FromRawFd, RawFd};
 use std::process;
@@ -193,7 +194,17 @@ fn format_init_package(eps_cnt: u8) -> Vec<u8> {
 
 static USB_DEV_PATH: &str = "/dev/gadget/musb-hdrc";
 
-fn ep_io_thread(ep_fd: RawFd, ep_num: u8) {
+fn ep_io_thread(ep_fd: RawFd, ep_num: u8, filename: String) {
+    let mut duty_cycle_fp =
+    match OpenOptions::new().write(true).open(&filename) {
+        Ok(fp) => fp,
+        Err(_) => {
+            eprintln!("Warning: Could not open \"{}\". Stopping thread.",
+                      filename);
+            return;
+        },
+    };
+
     let fp = unsafe { File::from_raw_fd(ep_fd) };
     let poll_fd = PollFd::new(&fp, PollFlags::POLLIN);
 
@@ -210,12 +221,13 @@ fn ep_io_thread(ep_fd: RawFd, ep_num: u8) {
                 ep_num
             );
         } else {
-            println!(
-                "EP{}: Received {} bytes: {:?}",
-                ep_num,
-                bytes_cnt,
-                &buf[0..bytes_cnt as usize]
-            );
+            let result = duty_cycle_fp.write_all(&buf[0..bytes_cnt as usize]);
+            if result.is_err() {
+                eprintln!(
+                    "Warning: Could not write to \"{}\".",
+                    filename
+                );
+            }
         }
     }
 }
@@ -290,7 +302,7 @@ fn usb_gadget_get_string(id: u8) -> Option<Vec<u8>> {
     }
 }
 
-fn handle_setup_request(fd: RawFd, setup: &bindings::usb_ctrlrequest, eps_cnt: u8) {
+fn handle_setup_request(fd: RawFd, setup: &bindings::usb_ctrlrequest, files: Vec<String>) {
     match setup.bRequest as u32 {
         bindings::USB_REQ_GET_DESCRIPTOR => {
             println!("* * GET_DESCRIPTOR");
@@ -328,7 +340,8 @@ fn handle_setup_request(fd: RawFd, setup: &bindings::usb_ctrlrequest, eps_cnt: u
                     2 => {
                         /* Set configuration #2 */
 
-                        for i in 1..=eps_cnt {
+                        for (i, filename) in files.into_iter().enumerate() {
+                            let i = (i+1) as u8;
                             let ep_fd = init_ep(i);
                             let ep_fd = match ep_fd {
                                 Some(ep_fd) => ep_fd,
@@ -338,7 +351,7 @@ fn handle_setup_request(fd: RawFd, setup: &bindings::usb_ctrlrequest, eps_cnt: u
                                 }
                             };
                             thread::spawn(move || {
-                                ep_io_thread(ep_fd, i);
+                                ep_io_thread(ep_fd, i, filename);
                             });
                         }
                     }
@@ -376,7 +389,7 @@ fn handle_setup_request(fd: RawFd, setup: &bindings::usb_ctrlrequest, eps_cnt: u
     }
 }
 
-fn server_loop(fd: RawFd, eps_cnt: u8) {
+fn server_loop(fd: RawFd, files: Vec<String>) {
     let fp = unsafe { File::from_raw_fd(fd) };
     let poll_fd = PollFd::new(&fp, PollFlags::POLLIN);
 
@@ -419,7 +432,7 @@ fn server_loop(fd: RawFd, eps_cnt: u8) {
                 }
                 bindings::usb_gadgetfs_event_type_GADGETFS_SETUP => {
                     println!("* EP0 SETUP");
-                    handle_setup_request(fd, &unsafe { events[i].u.setup }, eps_cnt);
+                    handle_setup_request(fd, &unsafe { events[i].u.setup }, files.clone());
                 }
                 _ => break,
             }
@@ -427,7 +440,7 @@ fn server_loop(fd: RawFd, eps_cnt: u8) {
     }
 }
 
-pub fn start_server(eps_cnt: u8) {
+pub fn start_server(files: Vec<String>) {
     if stat::stat(USB_DEV_PATH).is_err() {
         eprintln!("Error: Could not stat \"{}\".", USB_DEV_PATH);
         process::exit(-1);
@@ -436,7 +449,7 @@ pub fn start_server(eps_cnt: u8) {
     let fd: RawFd =
         fcntl::open(USB_DEV_PATH, OFlag::O_RDWR | OFlag::O_SYNC, Mode::S_IRWXU).unwrap();
 
-    let package = format_init_package(eps_cnt);
+    let package = format_init_package(files.len() as u8);
     let package = package.as_slice();
     let bytes_cnt = unsafe {
         libc::write(
@@ -454,5 +467,5 @@ pub fn start_server(eps_cnt: u8) {
     }
 
     println!("Info: EP0 configured. Starting the server.");
-    server_loop(fd, eps_cnt);
+    server_loop(fd, files);
 }

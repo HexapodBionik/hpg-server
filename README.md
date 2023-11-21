@@ -14,7 +14,7 @@ Resulting executable file will be in
 run it directly or through `cargo`
 package manager by issuing the command:
 ```
-cargo run --release -- -e <number of endpoints>
+cargo run --release -- {filenames}
 ```
 
 # Usage
