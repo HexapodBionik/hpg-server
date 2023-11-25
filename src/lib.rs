@@ -192,8 +192,6 @@ fn format_init_package(eps_cnt: u8) -> Vec<u8> {
     package
 }
 
-static USB_DEV_PATH: &str = "/dev/gadget/musb-hdrc";
-
 fn ep_io_thread(ep_fd: RawFd, ep_num: u8, filename: String) {
     let mut duty_cycle_fp =
     match OpenOptions::new().write(true).open(&filename) {
@@ -389,7 +387,7 @@ fn handle_setup_request(fd: RawFd, setup: &bindings::usb_ctrlrequest, files: Vec
     }
 }
 
-fn server_loop(fd: RawFd, files: Vec<String>) {
+fn server_loop(fd: RawFd, usb_dev_path: String, files: Vec<String>) {
     let fp = unsafe { File::from_raw_fd(fd) };
     let poll_fd = PollFd::new(&fp, PollFlags::POLLIN);
 
@@ -413,7 +411,7 @@ fn server_loop(fd: RawFd, files: Vec<String>) {
             eprintln!(
                 "Warning: Could not read {} bytes from \"{}\".",
                 mem::size_of::<bindings::usb_gadgetfs_event>() * events.len(),
-                USB_DEV_PATH
+                usb_dev_path
             );
             return;
         }
@@ -440,14 +438,14 @@ fn server_loop(fd: RawFd, files: Vec<String>) {
     }
 }
 
-pub fn start_server(files: Vec<String>) {
-    if stat::stat(USB_DEV_PATH).is_err() {
-        eprintln!("Error: Could not stat \"{}\".", USB_DEV_PATH);
+pub fn start_server(usb_dev_path: String, files: Vec<String>) {
+    if stat::stat(usb_dev_path.as_str()).is_err() {
+        eprintln!("Error: Could not stat \"{}\".", usb_dev_path);
         process::exit(-1);
     }
 
     let fd: RawFd =
-        fcntl::open(USB_DEV_PATH, OFlag::O_RDWR | OFlag::O_SYNC, Mode::S_IRWXU).unwrap();
+        fcntl::open(usb_dev_path.as_str(), OFlag::O_RDWR | OFlag::O_SYNC, Mode::S_IRWXU).unwrap();
 
     let package = format_init_package(files.len() as u8);
     let package = package.as_slice();
@@ -461,11 +459,11 @@ pub fn start_server(files: Vec<String>) {
     if bytes_cnt < 0 {
         eprintln!(
             "Error: Write to \"{}\" failed (error {}).",
-            USB_DEV_PATH, -bytes_cnt
+            usb_dev_path, -bytes_cnt
         );
         process::exit(-1);
     }
 
     println!("Info: EP0 configured. Starting the server.");
-    server_loop(fd, files);
+    server_loop(fd, usb_dev_path, files);
 }
