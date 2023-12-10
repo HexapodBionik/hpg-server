@@ -1,7 +1,7 @@
 # Hexapod PWM Gadget USB Server
 
 ## Introduction
-This repository contains the USB server component of the Hexapod PWM Gadget firmware, which manages USB communication between the Hexapod device and a host computer. The project is developed in Rust and is intended for developers and enthusiasts working with the Hexapod PWM Gadget.
+This repository contains the USB server component of the Hexapod PWM Gadget firmware, which manages USB communication between the Hexapod PWM Gadget device and a host computer. The project is developed in Rust and is intended for developers and enthusiasts working with the Hexapod PWM Gadget.
 
 ## Prerequisites
 - Rust toolchain (cargo, rustc)
@@ -36,9 +36,6 @@ Currently, there are no user-modifiable configuration files or environmental var
 
 ## Troubleshooting
 If you encounter issues, ensure that you have the correct permissions to access USB devices and that the gadgetfs kernel module is loaded. For additional help, please submit an issue on the GitHub repository.
-
-## Contributing
-Contributions to the `hpg-server` project are welcome! If you want to contribute code, documentation, or report bugs, please refer to the CONTRIBUTING.md file for guidelines.
 
 ## License
 This project is released under the GPL-2.0 license. For more information, please see the LICENSE file in the repository.
